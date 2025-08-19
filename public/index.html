@@ -1317,21 +1317,23 @@
       const token = localStorage.getItem('token');
       
       if (!token) {
-        console.log('No token found, redirecting to auth');
-        window.location.href = '/auth.html?redirect=' + encodeURIComponent(window.location.pathname);
-        return;
+        // Only redirect if not already on auth page
+        if (!window.location.pathname.includes('auth.html')) {
+          console.log('No token found, redirecting to auth');
+          window.location.href = '/auth.html?redirect=' + encodeURIComponent(window.location.pathname);
+        }
+        return false;
       }
       
       // Check token expiry first
       const tokenExpiry = localStorage.getItem('tokenExpiry');
       if (tokenExpiry && Date.now() > parseInt(tokenExpiry)) {
-        console.log('Token expired, clearing storage and redirecting');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('username');
-        localStorage.removeItem('tokenExpiry');
-        window.location.href = '/auth.html?redirect=' + encodeURIComponent(window.location.pathname);
-        return;
+        console.log('Token expired, clearing storage');
+        clearAuthData();
+        if (!window.location.pathname.includes('auth.html')) {
+          window.location.href = '/auth.html?redirect=' + encodeURIComponent(window.location.pathname);
+        }
+        return false;
       }
       
       try {
@@ -1369,6 +1371,7 @@
           lastPostTime = new Date();
           
           console.log('User authenticated successfully:', currentUser.username);
+          return true;
         } else {
           const errorText = await response.text();
           console.log('Token validation failed, status:', response.status, 'Response:', errorText);
@@ -1378,23 +1381,27 @@
         console.error('Authentication error:', error);
         
         // Clear invalid token and redirect
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('username');
-        localStorage.removeItem('tokenExpiry');
+        clearAuthData();
         
         // Only redirect if not already on auth page
         if (!window.location.pathname.includes('auth.html')) {
           window.location.href = '/auth.html?redirect=' + encodeURIComponent(window.location.pathname);
         }
+        return false;
       }
+    }
+    
+    // Helper function to clear auth data
+    function clearAuthData() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('username');
+      localStorage.removeItem('tokenExpiry');
     }
     
     // Logout function
     function logout() {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('username');
+      clearAuthData();
       if (socket) {
         socket.disconnect();
       }

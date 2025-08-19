@@ -611,6 +611,7 @@
         });
 
         socket.on('newMessage', (message) => {
+          console.log('Received new message:', message);
           if (currentChat && message.chatId === currentChat._id) {
             displayMessage(message);
             markMessagesAsRead(currentChat._id);
@@ -926,8 +927,6 @@
       
       if (!content || !currentChat) return;
 
-      console.log('Sending message:', content, 'to chat:', currentChat._id);
-      
       socket.emit('sendMessage', {
         chatId: currentChat._id,
         content: content
@@ -1512,6 +1511,7 @@
         });
 
         socket.on('newMessage', (message) => {
+          console.log('Received new message:', message);
           if (currentChat && message.chatId === currentChat._id) {
             displayMessage(message);
             markMessagesAsRead(currentChat._id);

@@ -1170,7 +1170,9 @@ app.get('/api/chats/:chatId/messages', authenticateToken, async (req, res) => {
       .limit(parseInt(limit))
       .skip(parseInt(page) * parseInt(limit));
 
-    res.json(messages.reverse());
+    const reversedMessages = messages.reverse();
+    console.log(`Loaded ${reversedMessages.length} messages for chat ${chatId}`);
+    res.json(reversedMessages);
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ error: 'Server error' });

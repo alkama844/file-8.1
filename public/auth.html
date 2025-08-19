@@ -448,12 +448,14 @@
             // Check if there's a redirect URL
             const urlParams = new URLSearchParams(window.location.search);
             const redirect = urlParams.get('redirect') || '/';
+            console.log('Login successful, redirecting to:', redirect);
             window.location.href = redirect;
           }, 1000);
         } else {
           showError(data.error || 'Login failed');
         }
       } catch (error) {
+        console.error('Login error:', error);
         showError('Network error. Please try again.');
       } finally {
         loginBtn.textContent = '🚀 Login';
@@ -510,12 +512,14 @@
             // Check if there's a redirect URL
             const urlParams = new URLSearchParams(window.location.search);
             const redirect = urlParams.get('redirect') || '/';
+            console.log('Registration successful, redirecting to:', redirect);
             window.location.href = redirect;
           }, 1000);
         } else {
           showError(data.error || 'Registration failed');
         }
       } catch (error) {
+        console.error('Registration error:', error);
         showError('Network error. Please try again.');
       } finally {
         registerBtn.textContent = '✨ Create Account';

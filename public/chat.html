@@ -926,6 +926,8 @@
       
       if (!content || !currentChat) return;
 
+      console.log('Sending message:', content, 'to chat:', currentChat._id);
+      
       socket.emit('sendMessage', {
         chatId: currentChat._id,
         content: content

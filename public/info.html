@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#000000" />
-  <title>About Me</title>
+  <title>About - Chatty</title>
 
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" href="/icon.png">
@@ -116,16 +116,15 @@
 
     <button onclick="toggleTheme()">🌙 Toggle Theme</button>
 
-    <h1>About This Site</h1>
-    <p>This site allows users to upload and share text, photos, videos, audio, and attachments easily and anonymously.</p>
+    <h1>About Chatty</h1>
+    <p>Chatty is a modern social platform that combines real-time messaging with social sharing. Connect with friends, share moments, and stay in touch through our integrated chat and post system.</p>
     <p>Built with ❤️ by <span class="premium">NafijThePro25 🛠</span></p>
     
     <nav style="margin: 2rem 0;">
       <a href="/" style="margin-right: 1rem;">🏠 Home</a>
-      <a href="/all.html" style="margin-right: 1rem;">📋 All Posts</a>
-      <a href="/chat.html" style="margin-right: 1rem;">💬 Chat</a>
-      <a href="/search.html" style="margin-right: 1rem;">🔍 Search</a>
-      <a href="/admin.html">⚙️ Admin</a>
+      <a href="/all" style="margin-right: 1rem;">📋 All Posts</a>
+      <a href="/search" style="margin-right: 1rem;">🔍 Search</a>
+      <a href="/admin">⚙️ Admin</a>
     </nav>
 
     <div id="recent-posts"></div>
@@ -171,15 +170,3 @@
   </script>
 </body>
 </html>
-          const text = post.text || "";
-          container.innerHTML += `
-            <div class="post">
-              <p><strong>${name}</strong><br>${text}<br>${media}</p>
-            </div>`;
-        });
-      });
-  </script>
-</body>
-</html>
-
-    fetch('/api/posts?limit=5', { headers })

@@ -23,16 +23,13 @@ const io = socketIo(server, {
   }
 });
 
-// Trust proxy for Render deployment
+// Trust proxy for deployment
 app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-
-// Generate a stronger JWT secret if using default
-const STRONG_JWT_SECRET = process.env.JWT_SECRET || require('crypto').randomBytes(64).toString('hex');
+const JWT_SECRET = process.env.JWT_SECRET || 'nafij-social-share-2024-super-secure-jwt-secret-key-with-256-bits-entropy-for-maximum-security-and-protection-against-attacks';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'pronafij';
 
 // Security middleware
 app.use(helmet({
@@ -43,8 +40,8 @@ app.use(helmet({
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // limit each IP to 200 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 200,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -59,13 +56,12 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(express.static('public'));
 
-// Create uploads directory if it doesn't exist
+// Create uploads directory
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Serve uploaded files with proper headers
 app.use('/uploads', (req, res, next) => {
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
@@ -79,21 +75,21 @@ mongoose.connect(MONGODB_URI, {
 .then(() => console.log('Connected to MongoDB'))
 .catch(err => console.error('MongoDB connection error:', err));
 
-// User Schema (Enhanced)
+// User Schema (Enhanced from fullstack-chat-app)
 const userSchema = new mongoose.Schema({
-  fullName: {
-    type: String,
-    required: true,
-    trim: true,
-    minlength: 2,
-    maxlength: 50
-  },
   email: {
     type: String,
     required: true,
     unique: true,
     trim: true,
     lowercase: true
+  },
+  fullName: {
+    type: String,
+    required: true,
+    trim: true,
+    minlength: 2,
+    maxlength: 50
   },
   password: {
     type: String,
@@ -120,12 +116,8 @@ const userSchema = new mongoose.Schema({
   lastSeen: {
     type: Date,
     default: Date.now
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
   }
-});
+}, { timestamps: true });
 
 // Auto-set premium status based on email first letter
 userSchema.pre('save', function(next) {
@@ -139,7 +131,7 @@ userSchema.pre('save', function(next) {
 
 const User = mongoose.model('User', userSchema);
 
-// Message Schema (Enhanced)
+// Message Schema (From fullstack-chat-app)
 const messageSchema = new mongoose.Schema({
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -157,25 +149,12 @@ const messageSchema = new mongoose.Schema({
   },
   image: {
     type: String
-  },
-  messageType: {
-    type: String,
-    enum: ['text', 'image', 'file'],
-    default: 'text'
-  },
-  readBy: [{
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    readAt: { type: Date, default: Date.now }
-  }],
-  createdAt: {
-    type: Date,
-    default: Date.now
   }
-});
+}, { timestamps: true });
 
 const Message = mongoose.model('Message', messageSchema);
 
-// Post Schema (Keep existing)
+// Post Schema (Your existing posts)
 const postSchema = new mongoose.Schema({
   user: {
     type: String,
@@ -233,16 +212,12 @@ const postSchema = new mongoose.Schema({
       createdAt: { type: Date, default: Date.now }
     }]
   }],
-  hashtags: [String],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  hashtags: [String]
+}, { timestamps: true });
 
 const Post = mongoose.model('Post', postSchema);
 
-// Multer configuration for file uploads
+// Multer configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -256,8 +231,8 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
-    files: 10 // Max 10 files per upload
+    fileSize: 50 * 1024 * 1024,
+    files: 10
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|webm|avi|mov|mp3|wav|ogg|pdf|doc|docx|txt|zip|rar/;
@@ -275,16 +250,14 @@ const upload = multer({
   }
 });
 
-// JWT token generation
+// JWT token generation (From fullstack-chat-app)
 const generateToken = (userId, res) => {
-  const token = jwt.sign({ userId }, STRONG_JWT_SECRET, {
-    expiresIn: '7d',
-    issuer: 'nafij-social-share',
-    audience: 'nafij-users'
+  const token = jwt.sign({ userId }, JWT_SECRET, {
+    expiresIn: '7d'
   });
 
   res.cookie('jwt', token, {
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     httpOnly: true,
     sameSite: 'strict',
     secure: process.env.NODE_ENV !== 'development'
@@ -294,48 +267,41 @@ const generateToken = (userId, res) => {
 };
 
 // Authentication middleware
-const authenticateToken = async (req, res, next) => {
+const protectRoute = async (req, res, next) => {
   try {
-    const token = req.cookies.jwt || (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
+    const token = req.cookies.jwt;
 
     if (!token) {
-      return res.status(401).json({ error: 'Access token required' });
+      return res.status(401).json({ message: 'Unauthorized - No Token Provided' });
     }
 
-    const decoded = jwt.verify(token, STRONG_JWT_SECRET, {
-      issuer: 'nafij-social-share',
-      audience: 'nafij-users'
-    });
-    
-    const user = await User.findById(decoded.userId).select('-password');
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    if (!decoded) {
+      return res.status(401).json({ message: 'Unauthorized - Invalid Token' });
     }
-    
-    // Update last seen when token is used
-    await User.findByIdAndUpdate(user._id, { 
-      lastSeen: new Date(),
-      isOnline: true 
-    });
-    
+
+    const user = await User.findById(decoded.userId).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
     req.user = user;
     next();
   } catch (error) {
-    console.error('Token verification error:', error.message);
-    return res.status(403).json({ error: 'Invalid token' });
+    console.log('Error in protectRoute middleware: ', error.message);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Optional authentication middleware
+// Optional auth middleware for posts
 const optionalAuth = async (req, res, next) => {
-  const token = req.cookies.jwt || (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
+  const token = req.cookies.jwt;
 
   if (token) {
     try {
-      const decoded = jwt.verify(token, STRONG_JWT_SECRET, {
-        issuer: 'nafij-social-share',
-        audience: 'nafij-users'
-      });
+      const decoded = jwt.verify(token, JWT_SECRET);
       const user = await User.findById(decoded.userId).select('-password');
       if (user) {
         req.user = user;
@@ -347,235 +313,189 @@ const optionalAuth = async (req, res, next) => {
   next();
 };
 
-// Socket.IO connection handling
-const connectedUsers = new Map();
+// Socket.IO connection handling (Enhanced from fullstack-chat-app)
+const userSocketMap = {};
 
 function getReceiverSocketId(userId) {
-  return connectedUsers.get(userId.toString());
+  return userSocketMap[userId];
 }
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log('A user connected', socket.id);
 
-  // User authentication for socket
-  socket.on('authenticate', async (token) => {
-    try {
-      const decoded = jwt.verify(token, STRONG_JWT_SECRET, {
-        issuer: 'nafij-social-share',
-        audience: 'nafij-users'
+  const userId = socket.handshake.query.userId;
+  if (userId && userId !== 'undefined') {
+    userSocketMap[userId] = socket.id;
+    
+    // Update user online status
+    User.findByIdAndUpdate(userId, { 
+      isOnline: true,
+      lastSeen: new Date()
+    }).catch(console.error);
+  }
+
+  // Emit online users
+  io.emit('getOnlineUsers', Object.keys(userSocketMap));
+
+  // WebRTC signaling for calls
+  socket.on('webrtc-offer', (data) => {
+    const { targetUserId, offer } = data;
+    const targetSocketId = userSocketMap[targetUserId];
+    
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('webrtc-offer', {
+        offer,
+        senderId: userId
       });
-      const user = await User.findById(decoded.userId);
-      if (user) {
-        socket.userId = user._id.toString();
-        socket.username = user.fullName;
-        connectedUsers.set(user._id.toString(), socket.id);
-        
-        // Update user online status
-        await User.findByIdAndUpdate(user._id, { 
-          isOnline: true,
-          lastSeen: new Date()
-        });
-        
-        // Emit online users list
-        io.emit('getOnlineUsers', Array.from(connectedUsers.keys()));
-        
-        socket.emit('authenticated', { user: user.fullName });
-        
-        // WebRTC signaling for calls
-        socket.on('webrtc-offer', (data) => {
-          const { targetUserId, offer } = data;
-          const targetSocketId = connectedUsers.get(targetUserId);
-          
-          if (targetSocketId) {
-            io.to(targetSocketId).emit('webrtc-offer', {
-              offer,
-              senderId: socket.userId
-            });
-          }
-        });
-        
-        socket.on('webrtc-answer', (data) => {
-          const { targetUserId, answer } = data;
-          const targetSocketId = connectedUsers.get(targetUserId);
-          
-          if (targetSocketId) {
-            io.to(targetSocketId).emit('webrtc-answer', {
-              answer,
-              senderId: socket.userId
-            });
-          }
-        });
-        
-        socket.on('webrtc-ice-candidate', (data) => {
-          const { targetUserId, candidate } = data;
-          const targetSocketId = connectedUsers.get(targetUserId);
-          
-          if (targetSocketId) {
-            io.to(targetSocketId).emit('webrtc-ice-candidate', {
-              candidate,
-              senderId: socket.userId
-            });
-          }
-        });
-
-        // Call functionality
-        socket.on('initiateCall', (data) => {
-          const { targetUserId, callType } = data;
-          const targetSocketId = connectedUsers.get(targetUserId);
-          
-          if (targetSocketId) {
-            io.to(targetSocketId).emit('incomingCall', {
-              callerId: socket.userId,
-              callerName: socket.username,
-              callType
-            });
-          }
-        });
-
-        socket.on('callResponse', (data) => {
-          const { callerId, accepted } = data;
-          const callerSocketId = connectedUsers.get(callerId);
-          
-          if (callerSocketId) {
-            io.to(callerSocketId).emit('callResponse', {
-              accepted,
-              responderId: socket.userId,
-              responderName: socket.username
-            });
-          }
-        });
-
-        socket.on('callEnded', (data) => {
-          const { targetUserId } = data;
-          const targetSocketId = connectedUsers.get(targetUserId);
-          
-          if (targetSocketId) {
-            io.to(targetSocketId).emit('callEnded', {
-              endedBy: socket.userId
-            });
-          }
-        });
-        
-        socket.on('callCancelled', (data) => {
-          const { targetUserId } = data;
-          const targetSocketId = connectedUsers.get(targetUserId);
-          
-          if (targetSocketId) {
-            io.to(targetSocketId).emit('callCancelled', {
-              cancelledBy: socket.userId
-            });
-          }
-        });
-      }
-    } catch (error) {
-      socket.emit('authError', { error: 'Invalid token' });
+    }
+  });
+  
+  socket.on('webrtc-answer', (data) => {
+    const { targetUserId, answer } = data;
+    const targetSocketId = userSocketMap[targetUserId];
+    
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('webrtc-answer', {
+        answer,
+        senderId: userId
+      });
+    }
+  });
+  
+  socket.on('webrtc-ice-candidate', (data) => {
+    const { targetUserId, candidate } = data;
+    const targetSocketId = userSocketMap[targetUserId];
+    
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('webrtc-ice-candidate', {
+        candidate,
+        senderId: userId
+      });
     }
   });
 
-  // Handle disconnect
-  socket.on('disconnect', async () => {
-    console.log('User disconnected:', socket.id);
+  // Call functionality
+  socket.on('initiateCall', (data) => {
+    const { targetUserId, callType } = data;
+    const targetSocketId = userSocketMap[targetUserId];
     
-    if (socket.userId) {
-      connectedUsers.delete(socket.userId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('incomingCall', {
+        callerId: userId,
+        callerName: socket.username,
+        callType
+      });
+    }
+  });
+
+  socket.on('callResponse', (data) => {
+    const { callerId, accepted } = data;
+    const callerSocketId = userSocketMap[callerId];
+    
+    if (callerSocketId) {
+      io.to(callerSocketId).emit('callResponse', {
+        accepted,
+        responderId: userId,
+        responderName: socket.username
+      });
+    }
+  });
+
+  socket.on('callEnded', (data) => {
+    const { targetUserId } = data;
+    const targetSocketId = userSocketMap[targetUserId];
+    
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('callEnded', {
+        endedBy: userId
+      });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('A user disconnected', socket.id);
+    
+    if (userId && userId !== 'undefined') {
+      delete userSocketMap[userId];
       
       // Update user offline status
-      await User.findByIdAndUpdate(socket.userId, { 
+      User.findByIdAndUpdate(userId, { 
         isOnline: false,
         lastSeen: new Date()
-      });
-
-      // Emit updated online users list
-      io.emit('getOnlineUsers', Array.from(connectedUsers.keys()));
+      }).catch(console.error);
     }
+    
+    io.emit('getOnlineUsers', Object.keys(userSocketMap));
   });
 });
 
-// Routes
-
-// Auth Routes
+// Auth Routes (From fullstack-chat-app)
 app.post('/api/auth/signup', [
   body('fullName').isLength({ min: 2, max: 50 }).trim(),
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 6 })
 ], async (req, res) => {
+  const { fullName, email, password } = req.body;
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
+      return res.status(400).json({ message: 'All fields are required' });
     }
 
-    const { fullName, email, password } = req.body;
-    
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email already exists' });
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(12);
+    const user = await User.findOne({ email });
+
+    if (user) return res.status(400).json({ message: 'Email already exists' });
+
+    const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create user
-    const user = new User({
+    const newUser = new User({
       fullName,
       email,
-      password: hashedPassword
+      password: hashedPassword,
     });
 
-    await user.save();
+    if (newUser) {
+      generateToken(newUser._id, res);
+      await newUser.save();
 
-    // Generate JWT token
-    generateToken(user._id, res);
-
-    res.status(201).json({
-      _id: user._id,
-      fullName: user.fullName,
-      email: user.email,
-      profilePic: user.profilePic,
-      isPremium: user.isPremium
-    });
+      res.status(201).json({
+        _id: newUser._id,
+        fullName: newUser.fullName,
+        email: newUser.email,
+        profilePic: newUser.profilePic,
+        isPremium: newUser.isPremium
+      });
+    } else {
+      res.status(400).json({ message: 'Invalid user data' });
+    }
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.log('Error in signup controller', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
-app.post('/api/auth/login', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').notEmpty()
-], async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ message: 'Validation failed', errors: errors.array() });
-    }
-
-    const { email, password } = req.body;
-    
-    // Find user
     const user = await User.findOne({ email });
+
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Update last seen and online status
-    await User.findByIdAndUpdate(user._id, { 
-      lastSeen: new Date(),
-      isOnline: true 
-    });
-
-    // Generate JWT token
     generateToken(user._id, res);
 
-    res.json({
+    res.status(200).json({
       _id: user._id,
       fullName: user.fullName,
       email: user.email,
@@ -583,8 +503,8 @@ app.post('/api/auth/login', [
       isPremium: user.isPremium
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.log('Error in login controller', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
@@ -593,61 +513,69 @@ app.post('/api/auth/logout', (req, res) => {
     res.cookie('jwt', '', { maxAge: 0 });
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
-    console.error('Logout error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.log('Error in logout controller', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
-app.get('/api/auth/check', authenticateToken, async (req, res) => {
+app.put('/api/auth/update-profile', protectRoute, upload.single('profilePic'), async (req, res) => {
   try {
-    res.status(200).json(req.user);
-  } catch (error) {
-    console.error('Check auth error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+    const { profilePic } = req.body;
+    const userId = req.user._id;
 
-app.put('/api/auth/update-profile', authenticateToken, upload.single('profilePic'), async (req, res) => {
-  try {
-    const { fullName, bio } = req.body;
-    const updateData = {};
-    
-    if (fullName) updateData.fullName = fullName;
-    if (bio !== undefined) updateData.bio = bio;
+    let imageUrl = req.user.profilePic;
     
     if (req.file) {
-      updateData.profilePic = `/uploads/${req.file.filename}`;
+      imageUrl = `/uploads/${req.file.filename}`;
+    } else if (profilePic && profilePic.startsWith('data:')) {
+      // Handle base64 image
+      const base64Data = profilePic.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const filename = `profile-${userId}-${Date.now()}.jpg`;
+      const filepath = path.join(uploadsDir, filename);
+      
+      fs.writeFileSync(filepath, buffer);
+      imageUrl = `/uploads/${filename}`;
     }
 
     const updatedUser = await User.findByIdAndUpdate(
-      req.user._id,
-      updateData,
+      userId,
+      { profilePic: imageUrl },
       { new: true }
     ).select('-password');
 
-    res.json(updatedUser);
+    res.status(200).json(updatedUser);
   } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.log('error in update profile:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 
-// Message Routes
-app.get('/api/messages/users', authenticateToken, async (req, res) => {
+app.get('/api/auth/check', protectRoute, (req, res) => {
+  try {
+    res.status(200).json(req.user);
+  } catch (error) {
+    console.log('Error in checkAuth controller', error.message);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Message Routes (From fullstack-chat-app)
+app.get('/api/messages/users', protectRoute, async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const users = await User.find({ _id: { $ne: loggedInUserId } })
+    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
       .select('-password')
       .sort({ isOnline: -1, lastSeen: -1 });
 
-    res.json(users);
+    res.status(200).json(filteredUsers);
   } catch (error) {
-    console.error('Get users error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error in getUsersForSidebar: ', error.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.get('/api/messages/:id', authenticateToken, async (req, res) => {
+app.get('/api/messages/:id', protectRoute, async (req, res) => {
   try {
     const { id: userToChatId } = req.params;
     const myId = req.user._id;
@@ -655,29 +583,36 @@ app.get('/api/messages/:id', authenticateToken, async (req, res) => {
     const messages = await Message.find({
       $or: [
         { senderId: myId, receiverId: userToChatId },
-        { senderId: userToChatId, receiverId: myId }
-      ]
-    })
-    .populate('senderId', 'fullName profilePic')
-    .populate('receiverId', 'fullName profilePic')
-    .sort({ createdAt: 1 });
+        { senderId: userToChatId, receiverId: myId },
+      ],
+    }).populate('senderId', 'fullName profilePic')
+      .populate('receiverId', 'fullName profilePic');
 
-    res.json(messages);
+    res.status(200).json(messages);
   } catch (error) {
-    console.error('Get messages error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.log('Error in getMessages controller: ', error.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-app.post('/api/messages/send/:id', authenticateToken, upload.single('image'), async (req, res) => {
+app.post('/api/messages/send/:id', protectRoute, upload.single('image'), async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, image } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
     let imageUrl;
     if (req.file) {
       imageUrl = `/uploads/${req.file.filename}`;
+    } else if (image && image.startsWith('data:')) {
+      // Handle base64 image
+      const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const filename = `message-${Date.now()}.jpg`;
+      const filepath = path.join(uploadsDir, filename);
+      
+      fs.writeFileSync(filepath, buffer);
+      imageUrl = `/uploads/${filename}`;
     }
 
     const newMessage = new Message({
@@ -685,12 +620,9 @@ app.post('/api/messages/send/:id', authenticateToken, upload.single('image'), as
       receiverId,
       text,
       image: imageUrl,
-      messageType: imageUrl ? 'image' : 'text'
     });
 
     await newMessage.save();
-    
-    // Populate sender info
     await newMessage.populate('senderId', 'fullName profilePic');
     await newMessage.populate('receiverId', 'fullName profilePic');
 
@@ -701,34 +633,14 @@ app.post('/api/messages/send/:id', authenticateToken, upload.single('image'), as
 
     res.status(201).json(newMessage);
   } catch (error) {
-    console.error('Send message error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.log('Error in sendMessage controller: ', error.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Post Routes (Keep existing functionality)
-app.post('/api/posts', upload.array('files', 10), async (req, res) => {
+// Post Routes (Your existing functionality)
+app.post('/api/posts', protectRoute, upload.array('files', 10), async (req, res) => {
   try {
-    const token = req.cookies.jwt || (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
-    
-    if (!token) {
-      return res.status(401).json({ error: 'Access token required' });
-    }
-
-    let user;
-    try {
-      const decoded = jwt.verify(token, STRONG_JWT_SECRET, {
-        issuer: 'nafij-social-share',
-        audience: 'nafij-users'
-      });
-      user = await User.findById(decoded.userId);
-      if (!user) {
-        return res.status(401).json({ error: 'Invalid token' });
-      }
-    } catch (error) {
-      return res.status(403).json({ error: 'Invalid token' });
-    }
-
     const { text } = req.body;
     
     const uploadedFiles = [];
@@ -751,8 +663,8 @@ app.post('/api/posts', upload.array('files', 10), async (req, res) => {
     }));
 
     const post = new Post({
-      user: user.fullName,
-      userId: user._id,
+      user: req.user.fullName,
+      userId: req.user._id,
       text: text || '',
       media,
       hashtags: hashtags.map(tag => tag.toLowerCase())
@@ -772,7 +684,7 @@ app.post('/api/posts', upload.array('files', 10), async (req, res) => {
 
 app.get('/api/posts', optionalAuth, async (req, res) => {
   try {
-    const { page = 0, limit = 10, userId, since } = req.query;
+    const { page = 0, limit = 10, userId, since, topLiked } = req.query;
     
     let query = {};
     if (userId) {
@@ -783,13 +695,25 @@ app.get('/api/posts', optionalAuth, async (req, res) => {
       query.createdAt = { $gt: new Date(since) };
     }
 
-    const posts = await Post.find(query)
-      .populate('userId', 'fullName email isPremium profilePic')
-      .populate('comments.userId', 'fullName isPremium profilePic')
-      .populate('comments.replies.userId', 'fullName isPremium profilePic')
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit))
-      .skip(parseInt(page) * parseInt(limit));
+    let posts;
+    
+    if (topLiked === 'true') {
+      // Get top 10 liked posts for welcome screen
+      posts = await Post.find(query)
+        .populate('userId', 'fullName email isPremium profilePic')
+        .populate('comments.userId', 'fullName isPremium profilePic')
+        .populate('comments.replies.userId', 'fullName isPremium profilePic')
+        .sort({ likes: -1 })
+        .limit(10);
+    } else {
+      posts = await Post.find(query)
+        .populate('userId', 'fullName email isPremium profilePic')
+        .populate('comments.userId', 'fullName isPremium profilePic')
+        .populate('comments.replies.userId', 'fullName isPremium profilePic')
+        .sort({ createdAt: -1 })
+        .limit(parseInt(limit))
+        .skip(parseInt(page) * parseInt(limit));
+    }
 
     if (req.user) {
       posts.forEach(post => {
@@ -810,8 +734,7 @@ app.get('/api/posts', optionalAuth, async (req, res) => {
   }
 });
 
-// Keep all other existing post routes (like, comment, delete, etc.)
-app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
+app.post('/api/posts/:id/like', protectRoute, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) {
@@ -840,6 +763,38 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
     res.json({ likes: post.likes, liked: !userLiked });
   } catch (error) {
     console.error('Like post error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/posts/:id', protectRoute, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (post.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ error: 'Not authorized to delete this post' });
+    }
+
+    // Delete associated files
+    if (post.media && post.media.length > 0) {
+      post.media.forEach(file => {
+        const filePath = path.join(__dirname, file.url);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
+    }
+
+    await Post.findByIdAndDelete(req.params.id);
+
+    io.emit('postDeleted', { postId: req.params.id });
+
+    res.json({ message: 'Post deleted successfully' });
+  } catch (error) {
+    console.error('Delete post error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -899,7 +854,7 @@ app.get('/api/search', optionalAuth, async (req, res) => {
   }
 });
 
-// Admin routes (keep existing)
+// Admin routes
 let registrationEnabled = true;
 
 app.get('/api/auth/registration-status', (req, res) => {
@@ -922,6 +877,56 @@ app.post('/api/admin/toggle-registration', async (req, res) => {
   }
 });
 
+app.post('/api/admin/posts', async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    if (password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'Invalid admin password' });
+    }
+    
+    const posts = await Post.find()
+      .populate('userId', 'fullName email isPremium profilePic')
+      .sort({ createdAt: -1 });
+    
+    res.json(posts);
+  } catch (error) {
+    console.error('Get admin posts error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.delete('/api/admin/posts/:id', async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    if (password !== ADMIN_PASSWORD) {
+      return res.status(401).json({ error: 'Invalid admin password' });
+    }
+    
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    // Delete associated files
+    if (post.media && post.media.length > 0) {
+      post.media.forEach(file => {
+        const filePath = path.join(__dirname, file.url);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      });
+    }
+
+    await Post.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Post deleted successfully' });
+  } catch (error) {
+    console.error('Delete admin post error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Error handling middleware
 app.use((error, req, res, next) => {
   console.error('Error:', error);
@@ -938,24 +943,31 @@ app.use((error, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
+// Serve static files and routes
+app.get('/all', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'all.html'));
+});
+
+app.get('/info', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'info.html'));
+});
+
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/search', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'search.html'));
+});
+
+app.get('/profile', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'profile.html'));
+});
+
 // Catch-all route for SPA
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
     return res.status(404).json({ error: 'Not found' });
-  }
-  
-  if (req.path === '/info.html' || req.path === '/search.html' || 
-      req.path === '/profile.html' || req.path === '/all.html' || 
-      req.path === '/admin.html') {
-    return res.sendFile(path.join(__dirname, 'public', req.path));
-  }
-  
-  if (req.path === '/info') {
-    return res.sendFile(path.join(__dirname, 'public', 'info.html'));
-  }
-  
-  if (req.path === '/admin') {
-    return res.sendFile(path.join(__dirname, 'public', 'admin.html'));
   }
   
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

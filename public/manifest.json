@@ -1,7 +1,7 @@
 {
-  "name": "Nafij's Social Share",
-  "short_name": "SocialShare",
-  "description": "Advanced social sharing platform with offline support and media streaming",
+  "name": "Chatty - FOR YOU",
+  "short_name": "Chatty",
+  "description": "Connect with friends and share moments - Real-time messaging and social sharing platform",
   "start_url": "/?utm_source=pwa",
   "display": "standalone",
   "orientation": "portrait-primary",
